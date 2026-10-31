@@ -46,9 +46,16 @@
 
   <main class="vp" id="vp">
     <div class="stage" id="stage"><svg id="links"></svg><div id="cards"></div></div>
+    <canvas id="globe" hidden aria-label="الشجرة على شكل كورة"></canvas>
+    <div class="ghint" id="gHint" hidden>اسحب عشان تلف الكورة، ودوس على أي نقطة</div>
     <div class="empty" id="empty" hidden></div>
     <div class="banner" id="demoBar" hidden><span>ده مثال للتجربة، مش هيتحفظ</span><button id="exitDemo">اخرج من المثال</button></div>
     <div class="branchbar" id="branchBar" hidden><span id="branchTxt"></span><button id="showAll">الشجرة كلها</button></div>
+    <div class="legend" id="legend" hidden></div>
+    <div class="viewbar" id="viewbar" hidden>
+      <div class="vseg" role="tablist" aria-label="شكل الشجرة"><button data-v="classic">كروت</button><button data-v="tree">شجرة</button><button data-v="radial">دائرة</button><button data-v="globe">كورة</button></div>
+      <button class="ibtn" id="bColor" title="تلوين" aria-label="تلوين الشجرة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.3-.5-.8-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7" r="1.2" fill="currentColor"/></svg></button>
+    </div>
     <div class="zoom">
       <button class="ibtn" id="zIn" aria-label="تكبير"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
       <button class="ibtn" id="zOut" aria-label="تصغير"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>

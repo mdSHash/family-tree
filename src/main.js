@@ -1,6 +1,10 @@
 import './style.css';
 import { api, ls, outbox, liveChannel, configured } from './api.js';
 import { registerSW } from 'virtual:pwa-register';
+import { avatarURL, ageGroup } from './avatars.js';
+import { colorMap, legendFor, layoutTree, layoutRadial, classicScene, renderSVG } from './scene.js';
+import { Globe } from './globe.js';
+import { THEMES, QUALITY, posterLayout, drawPoster, renderPNG, posterDims } from './poster.js';
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -17,7 +21,8 @@ const initial=p=>esc((p?.name||'؟').trim().charAt(0));
 const yearsTxt=p=>{ if(!p) return ''; const b=p.birth,d=p.death;
   if(p.deceased){ if(b&&d) return AR(b)+' – '+AR(d); if(d) return 'تُوفي '+AR(d); if(b) return AR(b)+' – ؟'; return isF(p)?'رحمها الله':'رحمه الله'; }
   return b?AR(b):''; };
-const ph=(p)=>p?.photo?`<img src="${esc(p.photo)}" alt="" loading="lazy">`:initial(p);
+const imgSrc=p=>p?.photo||avatarURL(p?.gender==='f'?'f':'m',ageGroup(p||{},kidsOf));
+const ph=(p)=>p?`<img src="${esc(imgSrc(p))}" alt="" loading="lazy">`:'';
 /* ---------- toast ---------- */
 let tT; function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove('on'),2600); }
 
@@ -72,22 +77,36 @@ function layout(){
   cards.forEach(c=>c.x=W-c.x-CW);
   links.forEach(l=>{ if(l.t==='m'){ const a=W-l.x1,b=W-l.x2; l.x1=Math.min(a,b); l.x2=Math.max(a,b); } else { l.ax=W-l.ax; l.cx=W-l.cx; } });
   const pos=new Map(); for(const c of cards){ if(c.kind==='p') pos.set(c.id,c); } for(const c of cards){ if(c.kind==='sp'&&!pos.has(c.id)) pos.set(c.id,c); }
-  return {cards,links,W,H:maxY,pos,gens:cards.length?maxD+1:0};
+  return {cards,links,W,H:maxY,pos,gens:cards.length?maxD+1:0,forest};
 }
 
 /* ---------- render ---------- */
 const stage=$('#stage'),vp=$('#vp');
 function render(){
-  const L=S.lay=layout();
-  stage.style.width=L.W+'px'; stage.style.height=L.H+'px';
-  const sv=$('#links'); sv.setAttribute('width',L.W); sv.setAttribute('height',L.H);
-  const hl=S.hl;
-  sv.innerHTML=L.links.map(l=>{ const on=hl.size&&hl.has(l.a)&&hl.has(l.b);
-    return l.t==='m'?`<path class="lk m${on?' hl':''}" d="M${l.x1} ${l.y}H${l.x2}"/>`:`<path class="lk${on?' hl':''}" d="M${l.ax} ${l.ay}V${l.by}H${l.cx}V${l.cy}"/>`; }).join('');
-  $('#cards').innerHTML=L.cards.map(c=>{ const p=P(c.id); if(!p) return '';
-    const cls=['card',isF(p)?'f':'m',p.deceased?'dec':'',S.sel===c.id?'sel':'',hl.has(c.id)?'hl':'',(c.kind==='ref'||c.kind==='dup')?'ghost':''].join(' ');
-    const tag=(c.kind==='ref'||c.kind==='dup')?`<span class="tag">${c.kind==='ref'?'متجوز في فرع تاني':'موجود في فرع تاني'}</span>`:'';
-    return `<button class="${cls}" style="left:${c.x}px;top:${c.y}px" data-id="${esc(c.id)}" data-k="${c.kind}" aria-label="${esc(p.name)}"><span class="ph">${ph(p)}</span><span class="nm">${esc(p.name)}</span><span class="yr">${yearsTxt(p)||'&nbsp;'}</span>${tag}</button>`; }).join('');
+  const L=layout(); S.forest=L.forest; S.colors=colorMap(L.forest,S.colorMode,P);
+  const hl=S.hl, sv=$('#links'), view=S.view, gl=$('#globe');
+  stage.hidden=view==='globe'; gl.hidden=view!=='globe';
+  if(view==='tree'||view==='radial'){
+    const sc=S.scene=(view==='tree'?layoutTree:layoutRadial)(L.forest,P,S.colors);
+    const pos=new Map(); for(const [id,n] of sc.pos) pos.set(id,{x:n.x-CW/2,y:n.y-CH/2,kind:n.kind});
+    S.lay={W:sc.W,H:sc.H,pos,cards:sc.nodes,gens:L.gens,classic:L};
+    stage.style.width=sc.W+'px'; stage.style.height=sc.H+'px'; sv.setAttribute('width',sc.W); sv.setAttribute('height',sc.H);
+    sv.classList.add('scene'); sv.innerHTML=renderSVG(sc,{P,img:imgSrc,yearsTxt,sel:S.sel,hl}); $('#cards').innerHTML='';
+  } else if(view==='globe'){
+    S.lay={...L,classic:L}; if(S.people.size){ const G=ensureGlobe(); G.setData({forest:L.forest,P,colors:S.colors,theme:globeTheme()}); G.setSelected(S.sel); G.start(); }
+  } else {
+    S.lay={...L,classic:L}; sv.classList.remove('scene');
+    stage.style.width=L.W+'px'; stage.style.height=L.H+'px'; sv.setAttribute('width',L.W); sv.setAttribute('height',L.H);
+    sv.innerHTML=L.links.map(l=>{ const on=hl.size&&hl.has(l.a)&&hl.has(l.b);
+      return l.t==='m'?`<path class="lk m${on?' hl':''}" d="M${l.x1} ${l.y}H${l.x2}"/>`:`<path class="lk${on?' hl':''}" d="M${l.ax} ${l.ay}V${l.by}H${l.cx}V${l.cy}"/>`; }).join('');
+    const tint=S.colorMode!=='gender';
+    $('#cards').innerHTML=L.cards.map(c=>{ const p=P(c.id); if(!p) return '';
+      const cls=['card',isF(p)?'f':'m',p.deceased?'dec':'',S.sel===c.id?'sel':'',hl.has(c.id)?'hl':'',(c.kind==='ref'||c.kind==='dup')?'ghost':''].join(' ');
+      const tag=(c.kind==='ref'||c.kind==='dup')?`<span class="tag">${c.kind==='ref'?'متجوز في فرع تاني':'موجود في فرع تاني'}</span>`:'';
+      return `<button class="${cls}" style="left:${c.x}px;top:${c.y}px${tint?`;--c:${S.colors.get(c.id)}`:''}" data-id="${esc(c.id)}" data-k="${c.kind}" aria-label="${esc(p.name)}"><span class="ph">${ph(p)}</span><span class="nm">${esc(p.name)}</span><span class="yr">${yearsTxt(p)||'&nbsp;'}</span>${tag}</button>`; }).join('');
+  }
+  if(G_.globe&&view!=='globe') G_.globe.stop();
+  renderViewbar(L);
   // stats
   const all=[...S.people.values()];
   $('#stats').innerHTML=all.length?`<span><b>${AR(all.length)}</b> فرد</span><span><b>${AR(L.gens)}</b> ${L.gens===1?'جيل':'أجيال'}</span><span><b>${AR(all.filter(p=>!p.deceased).length)}</b> عايشين</span>`:'';
@@ -117,19 +136,19 @@ function renderEmpty(n){ const e=$('#empty');
 /* ---------- pan & zoom ---------- */
 const view={x:20,y:20,k:1}; let didFit=false;
 function apply(){ stage.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.k})`; }
-const clampK=k=>Math.min(2.2,Math.max(0.08,k));
+const clampK=k=>Math.min(2.2,Math.max(0.02,k));
 function zoomAt(f,cx,cy){ const r=vp.getBoundingClientRect(); cx??=r.width/2; cy??=r.height/2; const k=clampK(view.k*f); const wx=(cx-view.x)/view.k,wy=(cy-view.y)/view.k; view.k=k; view.x=cx-wx*k; view.y=cy-wy*k; apply(); }
 function animate(){ stage.classList.add('anim'); clearTimeout(animate.t); animate.t=setTimeout(()=>stage.classList.remove('anim'),520); }
-function fit(anim=true){ const L=S.lay; if(!L||!L.cards.length) return; const r=vp.getBoundingClientRect(); const pad=40;
+function fit(anim=true){ if(S.view==='globe'){ G_.globe?.fit(); return; } const L=S.lay; if(!L||!L.cards.length) return; const r=vp.getBoundingClientRect(); const pad=40;
   const k=clampK(Math.min((r.width-pad*2)/L.W,(r.height-pad*2-60)/L.H,1));
   if(anim) animate(); view.k=k; view.x=(r.width-L.W*k)/2; view.y=Math.max(pad+30,(r.height-L.H*k)/2); apply(); }
-function centerOn(id){ const c=S.lay?.pos.get(id); if(!c) return; const r=vp.getBoundingClientRect(); const k=Math.max(view.k,0.85);
+function centerOn(id){ if(S.view==='globe'){ G_.globe?.setSelected(id); return; } const c=S.lay?.pos.get(id); if(!c) return; const r=vp.getBoundingClientRect(); const k=Math.max(view.k,0.85);
   const sheetOpen=$('#sheet').classList.contains('open'); const wide=innerWidth>=900;
   const cx=wide&&sheetOpen?(r.width+380)/2:r.width/2; const cy=!wide&&sheetOpen?r.height*0.28:r.height/2;
   animate(); view.k=k; view.x=cx-(c.x+CW/2)*k; view.y=cy-(c.y+CH/2)*k; apply();
-  setTimeout(()=>{ const el=stage.querySelector(`.card[data-id="${CSS.escape(id)}"][data-k="${c.kind}"]`); if(el){ el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); } },420); }
+  setTimeout(()=>{ const el=stage.querySelector(`.card[data-id="${CSS.escape(id)}"][data-k="${c.kind}"]`)||stage.querySelector(`.nd[data-id="${CSS.escape(id)}"]`); if(el){ el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); } },420); }
 const ptrs=new Map(); let downT=null,moved=false,last=null,pinch=null;
-vp.addEventListener('pointerdown',e=>{ if(e.target.closest('.zoom,.fab,.banner,.branchbar,.empty button')) return;
+vp.addEventListener('pointerdown',e=>{ if(S.view==='globe'||e.target.closest('.zoom,.fab,.banner,.branchbar,.empty button,.viewbar,.legend')) return;
   vp.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(ptrs.size===1){ downT=e.target; moved=false; last={x:e.clientX,y:e.clientY,ox:e.clientX,oy:e.clientY}; vp.classList.add('drag'); }
   if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; const r=vp.getBoundingClientRect(); pinch={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2-r.left,my:(a.y+b.y)/2-r.top,k:view.k,x:view.x,y:view.y}; moved=true; } });
@@ -142,14 +161,14 @@ vp.addEventListener('pointermove',e=>{ if(!ptrs.has(e.pointerId)) return; ptrs.s
     last.x=e.clientX; last.y=e.clientY; } });
 function endPtr(e){ if(!ptrs.has(e.pointerId)) return; ptrs.delete(e.pointerId); if(ptrs.size<2) pinch=null;
   if(ptrs.size===1){ const v=[...ptrs.values()][0]; last={x:v.x,y:v.y,ox:v.x,oy:v.y}; }
-  if(ptrs.size===0){ vp.classList.remove('drag'); if(!moved&&e.type==='pointerup'){ const c=downT?.closest?.('.card'); if(c) selectPerson(c.dataset.id); else if(S.sel&&innerWidth<900) closeSheet(); } last=null; } }
+  if(ptrs.size===0){ vp.classList.remove('drag'); if(!moved&&e.type==='pointerup'){ const c=downT?.closest?.('.card,.nd'); if(c) selectPerson(c.dataset.id); else if(S.sel&&innerWidth<900) closeSheet(); } last=null; } }
 vp.addEventListener('pointerup',endPtr); vp.addEventListener('pointercancel',endPtr);
-vp.addEventListener('wheel',e=>{ e.preventDefault(); const r=vp.getBoundingClientRect();
+vp.addEventListener('wheel',e=>{ if(S.view==='globe') return; e.preventDefault(); const r=vp.getBoundingClientRect();
   const mouse=e.deltaMode===1||(e.deltaX===0&&Math.abs(e.deltaY)>=50&&Number.isInteger(e.deltaY));
   if(e.ctrlKey||mouse) zoomAt(Math.exp(-e.deltaY*(e.ctrlKey?0.01:0.0018)),e.clientX-r.left,e.clientY-r.top);
   else { view.x-=e.deltaX; view.y-=e.deltaY; apply(); } },{passive:false});
 vp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.classList?.contains('card')) selectPerson(e.target.dataset.id); });
-$('#zIn').onclick=()=>{animate();zoomAt(1.25);}; $('#zOut').onclick=()=>{animate();zoomAt(0.8);}; $('#zFit').onclick=()=>fit();
+$('#zIn').onclick=()=>{ if(S.view==='globe') return G_.globe?.zoomBy(1.25); animate();zoomAt(1.25);}; $('#zOut').onclick=()=>{ if(S.view==='globe') return G_.globe?.zoomBy(0.8); animate();zoomAt(0.8);}; $('#zFit').onclick=()=>fit();
 
 /* ---------- sheet ---------- */
 function selectPerson(id){ S.sel=id; render(); openSheet(); }
@@ -402,60 +421,87 @@ q.addEventListener('keydown',e=>{ const bs=[...res.querySelectorAll('[data-go]')
 document.addEventListener('pointerdown',e=>{ if(!e.target.closest('.search')) res.hidden=true; });
 
 /* ---------- export ---------- */
-function loadImg(src){ return new Promise(r=>{ const i=new Image(); if(!src.startsWith('data:')) i.crossOrigin='anonymous'; i.onload=()=>r(i); i.onerror=()=>r(null); i.src=src; }); }
-function rr(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
-function wrap(g,text,max){ const ws=String(text).split(/\s+/); const lines=[]; let cur=''; for(const w of ws){ const t=cur?cur+' '+w:w; if(g.measureText(t).width<=max) cur=t; else { if(cur) lines.push(cur); cur=w; } } if(cur) lines.push(cur); if(lines.length>2){ lines.length=2; lines[1]+='…'; } return lines; }
-async function drawCanvas(){
-  try{ await Promise.all(['600 15px "Readex Pro"','400 13px "Readex Pro"','700 40px "Aref Ruqaa"'].map(f=>document.fonts.load(f))); }catch{}
-  const L=S.lay, pad=60, head=120; const W=L.W+pad*2, H=L.H+pad*2+head;
-  const s=Math.max(0.15,Math.min(2,Math.sqrt(15e6/(W*H))));
-  const cv=document.createElement('canvas'); cv.width=Math.round(W*s); cv.height=Math.round(H*s);
-  const g=cv.getContext('2d'); g.scale(s,s);
-  const X={bg:'#F3F5F1',card:'#FFFFFF',border:'#D2DBD3',ink:'#1C2A24',muted:'#5C6B63',line:'#94A79C',m:'#2E6C8C',ms:'#DCEAF1',f:'#A04E6C',fs:'#F4E1E8',acc:'#A86E22',dec:'#6B6760',brand:'#1F3A31'};
-  g.fillStyle=X.bg; g.fillRect(0,0,W,H);
-  g.direction='rtl'; g.textAlign='center'; g.textBaseline='alphabetic';
-  g.fillStyle=X.brand; g.font='700 44px "Aref Ruqaa", serif'; g.fillText($('#famName').textContent,W/2,70);
-  g.fillStyle=X.muted; g.font='400 16px "Readex Pro", sans-serif'; g.fillText(`${AR(S.people.size)} فرد  ،  ${AR(L.gens)} أجيال  ،  ${new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long'})}`,W/2,102);
-  g.translate(pad,pad+head);
-  g.lineJoin='round';
-  for(const l of L.links){ g.beginPath(); if(l.t==='m'){ g.strokeStyle=X.acc; g.lineWidth=2.5; g.moveTo(l.x1,l.y); g.lineTo(l.x2,l.y); } else { g.strokeStyle=X.line; g.lineWidth=2; g.moveTo(l.ax,l.ay); g.lineTo(l.ax,l.by); g.lineTo(l.cx,l.by); g.lineTo(l.cx,l.cy); } g.stroke(); }
-  const imgs=new Map(); await Promise.all(L.cards.map(async c=>{ const p=P(c.id); if(p?.photo&&!imgs.has(p.id)) imgs.set(p.id,await loadImg(p.photo)); }));
-  for(const c of L.cards){ const p=P(c.id); if(!p) continue; const f=isF(p), ghost=c.kind==='ref'||c.kind==='dup';
-    g.save(); g.shadowColor='rgba(28,42,36,.10)'; g.shadowBlur=12; g.shadowOffsetY=3; rr(g,c.x,c.y,CW,CH,18); g.fillStyle=X.card; g.fill(); g.restore();
-    rr(g,c.x,c.y,CW,CH,18); g.strokeStyle=X.border; g.lineWidth=1.5; if(ghost) g.setLineDash([6,5]); g.stroke(); g.setLineDash([]);
-    const cx=c.x+CW/2, cy=c.y+14+34, col=p.deceased?X.dec:(f?X.f:X.m);
-    g.beginPath(); g.arc(cx,cy,34,0,Math.PI*2); g.fillStyle=p.deceased?'#ECEDEA':(f?X.fs:X.ms); g.fill();
-    const im=imgs.get(p.id);
-    if(im){ g.save(); g.beginPath(); g.arc(cx,cy,32,0,Math.PI*2); g.clip(); if(p.deceased) g.filter='grayscale(1)'; g.drawImage(im,cx-32,cy-32,64,64); g.restore(); }
-    else { g.fillStyle=col; g.font='600 26px "Readex Pro", sans-serif'; g.textBaseline='middle'; g.fillText((p.name||'؟').trim().charAt(0),cx,cy+1); g.textBaseline='alphabetic'; }
-    g.beginPath(); g.arc(cx,cy,34,0,Math.PI*2); g.strokeStyle=col; g.lineWidth=3; g.stroke();
-    if(p.deceased){ g.beginPath(); g.arc(c.x+14.5,c.y+14.5,4.5,0,Math.PI*2); g.fillStyle=X.dec; g.fill(); }
-    g.fillStyle=X.ink; g.font='600 14.5px "Readex Pro", sans-serif'; const lines=wrap(g,p.name,CW-16); lines.forEach((ln,i)=>g.fillText(ln,cx,c.y+108+i*20));
-    const yt=yearsTxt(p); if(yt){ g.fillStyle=X.muted; g.font='400 12.5px "Readex Pro", sans-serif'; g.fillText(yt,cx,c.y+CH-14); }
-  }
-  return cv;
-}
 async function offer(filename,blob){
   const file=new File([blob],filename,{type:blob.type});
   const mobile=matchMedia('(pointer:coarse)').matches;
   if(mobile&&navigator.canShare?.({files:[file]})){ try{ await navigator.share({files:[file],title:famTitle()}); return; }catch(e){ if(e?.name==='AbortError') return; } }
   const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); toast('اتنزّل الملف');
 }
+
+/* ---------- views & colours ---------- */
+const VIEWS=[{id:'classic',l:'كروت'},{id:'tree',l:'شجرة'},{id:'radial',l:'دائرة'},{id:'globe',l:'كورة'}];
+const CMODES=[{id:'gender',l:'ولد وبنت',d:'أزرق للولاد، وردي للبنات'},{id:'gen',l:'بالجيل',d:'كل جيل له لون، تعرف مين في نفس المستوى'},{id:'branch',l:'بالفرع',d:'كل ابن من ولاد الجد الكبير وذريته لون واحد'}];
+S.view=ls.get('ft-view','classic'); if(!VIEWS.some(v=>v.id===S.view)) S.view='classic';
+S.colorMode=ls.get('ft-color','gender'); if(!CMODES.some(v=>v.id===S.colorMode)) S.colorMode='gender';
+const G_={globe:null};
+function ensureGlobe(){ if(!G_.globe){ G_.globe=new Globe($('#globe'),{onPick:id=>{ if(id) selectPerson(id); else if(S.sel) closeSheet(); }}); addEventListener('resize',()=>{ if(S.view==='globe') G_.globe.resize(); }); } G_.globe.resize(); return G_.globe; }
+function globeTheme(){ const cs=getComputedStyle(document.documentElement), v=k=>cs.getPropertyValue(k).trim();
+  return {ring:v('--border'),line:v('--line'),accent:v('--accent'),ink:v('--ink'),labelBg:v('--surface')}; }
+function renderViewbar(L){
+  const vb=$('#viewbar'); const has=S.people.size>0; vb.hidden=!has;
+  vb.querySelectorAll('[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
+  const lg=$('#legend'); const items=S.colorMode==='gender'||!has?[]:legendFor(S.forest,S.colorMode,P);
+  lg.hidden=!items.length; lg.innerHTML=items.slice(0,10).map(i=>`<span><i style="background:${i.color}"></i>${esc(i.label)}</span>`).join('');
+  $('#gHint').hidden=S.view!=='globe'||!has;
+}
+$('#viewbar').querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ if(S.view===b.dataset.v) return; S.view=b.dataset.v; ls.set('ft-view',S.view); didFit=false; render(); if(S.view!=='globe'){ didFit=true; fit(false); } });
+$('#bColor').onclick=()=>{
+  openDlg(`<div class="dlg-h"><h3>تلوين الشجرة</h3>${xBtn}</div><div class="dlg-b"><div class="choose">${CMODES.map(m=>`<button data-m="${m.id}" class="${S.colorMode===m.id?'on':''}"><span class="ic sw">${m.id==='gender'?'<i style="background:var(--male)"></i><i style="background:var(--female)"></i>':m.id==='gen'?'<i style="background:#2E7D6B"></i><i style="background:#B5762A"></i><i style="background:#8E4C8A"></i>':'<i style="background:#3D6FA8"></i><i style="background:#B0473D"></i><i style="background:#5B7F2E"></i>'}</span><span><b>${m.l}</b>${m.d}</span></button>`).join('')}</div></div>`);
+  $('#dlgIn').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ S.colorMode=b.dataset.m; ls.set('ft-color',S.colorMode); dlg.close(); render(); });
+};
+
+/* ---------- poster export ---------- */
+function loadImg(src){ return new Promise(r=>{ const i=new Image(); if(!src.startsWith('data:')) i.crossOrigin='anonymous'; i.onload=()=>r(i); i.onerror=()=>r(null); i.src=src; }); }
+async function preloadImages(ids){ const m=new Map(), byUrl=new Map();
+  await Promise.all([...ids].map(async id=>{ const p=P(id); if(!p) return; const u=imgSrc(p); if(!byUrl.has(u)) byUrl.set(u,loadImg(u)); let im=await byUrl.get(u);
+    if(!im&&p.photo){ const a=avatarURL(p.gender==='f'?'f':'m',ageGroup(p,kidsOf)); if(!byUrl.has(a)) byUrl.set(a,loadImg(a)); im=await byUrl.get(a); }
+    m.set(id,im); }));
+  return m; }
+let lastPoster={style:null,theme:'paper',quality:'xhd',legend:true};
 $('#bExport').onclick=()=>{
   if(!S.people.size){ toast('ضيف أفراد الأول'); return; }
-  openDlg(`<div class="dlg-h"><h3>تصدير الشجرة</h3>${xBtn}</div>
-    <div class="dlg-b"><p class="hint">هيتصدّر ${S.focus?'الفرع اللي معروض دلوقتي':'الشجرة كلها'} بألوان فاتحة تنفع للطباعة.</p>
-      <div class="seg" id="exFmt"><button class="on" data-f="png">صورة PNG</button><button data-f="pdf">ملف PDF</button></div>
-      <p class="hint" id="exMsg"></p></div>
-    <div class="dlg-f"><button class="btn pri" id="exGo">صدّر</button><button class="btn" data-close>إلغاء</button></div>`);
-  let fmt='png'; $('#exFmt').querySelectorAll('button').forEach(b=>b.onclick=()=>{ fmt=b.dataset.f; $('#exFmt').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); });
-  $('#exGo').onclick=async()=>{ const go=$('#exGo'); go.disabled=true; $('#exMsg').textContent='بنجهّز الملف…';
-    try{ const cv=await drawCanvas(); const base=famTitle().replace(/\s+/g,'-');
-      if(fmt==='png'){ const blob=await new Promise(r=>cv.toBlob(r,'image/png')); dlg.close(); await offer(base+'.png',blob); }
-      else { const {jsPDF}=await import('jspdf'); let w=cv.width,h=cv.height; const k=Math.min(1,14000/Math.max(w,h)); w*=k; h*=k;
+  const st=lastPoster.style||(S.view==='globe'?'radial':S.view);
+  const gens=S.lay?.gens||0;
+  openDlg(`<div class="dlg-h"><h3>صورة الشجرة</h3>${xBtn}</div>
+    <div class="dlg-b">
+      <div class="fld"><span class="lbl">الشكل</span><div class="seg" id="pStyle">${[['classic','كروت'],['tree','شجرة'],['radial','دائرة']].map(([k,l])=>`<button type="button" data-k="${k}" class="${st===k?'on':''}">${l}</button>`).join('')}</div></div>
+      <div class="fld"><span class="lbl">الخلفية</span><div class="seg" id="pTheme">${Object.entries(THEMES).map(([k,t])=>`<button type="button" data-k="${k}" class="${lastPoster.theme===k?'on':''}"><i class="tsw" style="background:${t.bg};border-color:${t.frame}"></i>${t.label}</button>`).join('')}</div></div>
+      <div class="fld"><label for="pTitle">العنوان</label><input type="text" id="pTitle" value="${esc(famTitle())}" maxlength="50"></div>
+      <div class="fld"><label for="pSub">سطر تحت العنوان (اختياري)</label><input type="text" id="pSub" value="${esc(`${AR(S.people.size)} فرد  ،  ${AR(gens)} أجيال`)}" maxlength="80"></div>
+      <div class="fld"><span class="lbl">الجودة</span><div class="seg" id="pQ">${QUALITY.map(q=>`<button type="button" data-k="${q.id}" class="${lastPoster.quality===q.id?'on':''}">${q.label}</button>`).join('')}</div><span class="hint" id="pQhint"></span></div>
+      ${S.colorMode!=='gender'?`<label class="check"><input type="checkbox" id="pLegend" ${lastPoster.legend?'checked':''}> اكتب دليل الألوان تحت العنوان</label>`:''}
+      <div class="prog" id="pProg" hidden><div></div></div><p class="hint" id="pMsg"></p>
+    </div>
+    <div class="dlg-f"><button class="btn pri" id="pPng">صورة PNG</button><button class="btn" id="pPdf">PDF</button><button class="btn" data-close>إلغاء</button></div>`);
+  const pick=(id,key)=>$('#'+id).querySelectorAll('button').forEach(b=>b.onclick=()=>{ lastPoster[key]=b.dataset.k; $('#'+id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); hint(); });
+  lastPoster.style=st; pick('pStyle','style'); pick('pTheme','theme'); pick('pQ','quality');
+  function build(){ const style=lastPoster.style; const colors=S.colors;
+    const sc=style==='classic'?classicScene(S.lay.classic||layout(),colors):(style==='tree'?layoutTree:layoutRadial)(S.forest,P,colors);
+    const legend=S.colorMode!=='gender'&&$('#pLegend')?.checked?legendFor(S.forest,S.colorMode,P):null;
+    const L=posterLayout(sc,{title:$('#pTitle').value.trim()||famTitle(),subtitle:$('#pSub').value.trim(),legend});
+    return {sc,L}; }
+  function hint(){ try{ const {L}=build(); const q=QUALITY.find(q=>q.id===lastPoster.quality); const d=posterDims(L,q); $('#pQhint').textContent=`${q.hint}، ${AR(d.W)}×${AR(d.H)} بكسل`; }catch{} }
+  hint();
+  async function go(fmt){
+    const btns=[$('#pPng'),$('#pPdf')]; btns.forEach(b=>b.disabled=true); const prog=$('#pProg'), bar=prog.firstElementChild; prog.hidden=false; $('#pMsg').textContent='بنجهّز الصورة…';
+    try{
+      try{ await Promise.all(['600 15px "Readex Pro"','500 13px "Readex Pro"','400 12px "Readex Pro"','700 40px "Aref Ruqaa"'].map(f=>document.fonts.load(f))); }catch{}
+      const {sc,L}=build(); const T=THEMES[lastPoster.theme]; const imgs=await preloadImages(new Set(sc.nodes.map(n=>n.id)));
+      const ctx={P,imgOf:p=>imgs.get(p.id),yearsTxt,meta:'',foot:`اتعملت بتطبيق شجرة العيلة  ،  ${new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long'})}`};
+      const q=QUALITY.find(q=>q.id===lastPoster.quality); const d=posterDims(L,q,fmt==='pdf'?7000:null);
+      const name=($('#pTitle').value.trim()||famTitle()).replace(/\s+/g,'-');
+      if(fmt==='png'){
+        const blob=await renderPNG({W:d.W,H:d.H,draw:g=>{ g.scale(d.s,d.s); drawPoster(g,sc,L,T,ctx); },onProgress:f=>bar.style.width=(f*100).toFixed(0)+'%'});
+        dlg.close(); await offer(name+'.png',blob);
+      } else {
+        const cv=document.createElement('canvas'); cv.width=d.W; cv.height=d.H; const g=cv.getContext('2d'); g.scale(d.s,d.s); drawPoster(g,sc,L,T,ctx); bar.style.width='70%';
+        const {jsPDF}=await import('jspdf'); const k=Math.min(1,14000/Math.max(d.W,d.H)); const w=d.W*k,h=d.H*k;
         const doc=new jsPDF({orientation:w>h?'l':'p',unit:'px',format:[w,h],hotfixes:['px_scaling'],compress:true});
-        doc.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,w,h); const blob=doc.output('blob'); dlg.close(); await offer(base+'.pdf',blob); }
-    }catch(err){ $('#exMsg').textContent='التصدير ماتمّش. جرّب PNG أو اعرض فرع أصغر.'; go.disabled=false; } };
+        doc.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,w,h); const blob=doc.output('blob'); dlg.close(); await offer(name+'.pdf',blob);
+      }
+    }catch(err){ console.warn(err); $('#pMsg').textContent='الصورة ماطلعتش. جرّب جودة أقل.'; btns.forEach(b=>b.disabled=false); prog.hidden=true; }
+  }
+  $('#pPng').onclick=()=>go('png'); $('#pPdf').onclick=()=>go('pdf');
 };
 
 /* ---------- demo ---------- */

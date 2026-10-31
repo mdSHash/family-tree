@@ -249,3 +249,58 @@ dialog::backdrop{background:rgba(10,18,15,.45)}
 .tf-line small{color:var(--muted)}
 .tf-line .ex{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
 .tf-sum{font-weight:600}
+
+/* ---------- avatars + colour band on cards ---------- */
+.card{--c:var(--male)} .card.f{--c:var(--female)}
+.card .ph{border-color:var(--c);background:var(--surface-2)}
+.card.f .ph{border-color:var(--c)}
+.card::before{content:"";position:absolute;inset:0 0 auto;height:6px;border-radius:16px 16px 0 0;background:var(--c);opacity:.9}
+.card.dec::before{background:var(--dec)}
+.ph-big img,.pchip i img{background:var(--surface-2)}
+
+/* ---------- scene views (tree / radial) ---------- */
+#links.scene{pointer-events:auto;overflow:hidden}
+#links.scene .lnk{fill:none;stroke:var(--c);stroke-width:var(--w);stroke-linecap:round;opacity:.75}
+#links.scene .lnk.m{stroke:var(--accent);stroke-width:2.5;opacity:.9}
+#links.scene .lnk.hl{opacity:1;stroke:var(--accent);stroke-width:calc(var(--w) + 2px)}
+#links.scene .ring{fill:none;stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 9}
+#links.scene .leaf{fill:var(--ok);opacity:.4}
+#links.scene .trunk{fill:color-mix(in srgb,var(--c) 30%,#7A5A3A)}
+#links.scene .ground{fill:var(--line);opacity:.25}
+.nd{cursor:pointer}
+.nd .halo{fill:var(--surface);filter:drop-shadow(0 2px 5px rgba(0,0,0,.15))}
+.nd .ringc{fill:none;stroke:var(--c);stroke-width:3.5}
+.nd text{text-anchor:middle;fill:var(--ink);font-family:var(--f-body);direction:rtl}
+.nd .nn{font-size:15px;font-weight:600} .nd .sn{font-size:13px;font-weight:500} .nd .yy{font-size:12px;fill:var(--muted)}
+.nd.dec image{filter:grayscale(1)} .nd.dec .ringc{stroke:var(--dec)}
+.nd.ghost .ringc{stroke-dasharray:5 4}
+.nd.sel .halo{fill:var(--accent-soft);stroke:var(--accent);stroke-width:3}
+.nd.hl .halo{fill:var(--accent-soft)}
+.nd.pulse .halo{animation:ndpulse 1.2s ease 2}
+@keyframes ndpulse{50%{stroke:var(--accent);stroke-width:14px;stroke-opacity:.35}}
+
+/* ---------- globe ---------- */
+#globe{position:absolute;inset:0;touch-action:none;cursor:grab;display:block}
+.ghint{position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 12px;border-radius:99px;z-index:4;pointer-events:none;white-space:nowrap}
+
+/* ---------- view switcher + legend ---------- */
+.viewbar{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;z-index:5}
+.vseg{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:3px;gap:2px;box-shadow:var(--shadow)}
+.vseg button{border:0;background:transparent;height:36px;padding:0 11px;border-radius:11px;font-size:13px;font-weight:500;color:var(--muted)}
+.vseg button.on{background:var(--brand);color:var(--brand-ink)}
+.viewbar .ibtn{box-shadow:var(--shadow)}
+.legend{position:absolute;bottom:calc(76px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:4px 10px;max-width:calc(100% - 32px);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px 10px;font-size:11.5px;color:var(--muted);z-index:5;box-shadow:var(--shadow)}
+.legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+@media (max-width:520px){
+  .viewbar{bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  .legend{bottom:calc(140px + env(safe-area-inset-bottom,0px))}
+  .vseg button{padding:0 9px}
+}
+.choose .ic.sw{gap:3px;display:flex;align-items:center;justify-content:center}
+.choose .ic.sw i{width:10px;height:22px;border-radius:5px;display:block}
+.choose button.on{border-color:var(--accent);background:var(--accent-soft)}
+.tsw{width:14px;height:14px;border-radius:50%;border:2px solid;display:inline-block;vertical-align:-2px;margin-inline-end:6px}
+.seg button{white-space:nowrap}
+.prog{height:6px;border-radius:9px;background:var(--surface-2);overflow:hidden}
+.prog div{height:100%;width:0;background:var(--brand);transition:width .2s}
