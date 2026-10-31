@@ -26,7 +26,7 @@ export function legendFor(forest, mode, P) {
   if (mode === 'branch') { const out = []; let k = 0; for (const t of forest) { const bp = branchPoint(t); for (const c of (bp?.children || [])) { if (c.ref) continue; out.push({ color: PALETTE[k++ % PALETTE.length], label: 'فرع ' + firstName(P(c.id)?.name) }); } } return out; }
   return [{ color: GENDER_COL.m, label: 'ذكر' }, { color: GENDER_COL.f, label: 'أنثى' }];
 }
-const firstName = n => String(n || '').replace(/^(الحاج|الحاجة|الشيخ|الأستاذ|الاستاذ|د\.|أ\.)\s+/, '').split(' ')[0];
+export const firstName = n => { const w = String(n || '').replace(/^(الحاج|الحاجة|الشيخ|الأستاذ|الاستاذ|د\.|أ\.)\s+/, '').split(/\s+/); return /^(عبد|عبدال|ابو|أبو|ام|أم)$/.test(w[0]) && w[1] ? w[0] + ' ' + w[1] : w[0]; };
 
 /* ---------- text measuring (shared by SVG + canvas) ---------- */
 const mctx = document.createElement('canvas').getContext('2d');
@@ -37,7 +37,13 @@ export function wrapLines(text, max, font) {
   if (lines.length > 2) { lines.length = 2; lines[1] += '…'; }
   return lines;
 }
-export const FONT = { name: '600 15px "Readex Pro", "Segoe UI", Tahoma, sans-serif', sname: '500 13px "Readex Pro", "Segoe UI", Tahoma, sans-serif', yr: '400 12px "Readex Pro", "Segoe UI", Tahoma, sans-serif' };
+const FF = '"Readex Pro", "Segoe UI", Tahoma, sans-serif';
+export const FONT = { name: `600 15px ${FF}`, sname: `500 13px ${FF}`, yr: `400 12px ${FF}` };
+// label sizes: the app uses the normal set; posters use the big set so names survive being viewed whole
+export function labelSpec(big) {
+  return big ? { name: `700 23px ${FF}`, sname: `600 20px ${FF}`, yr: `500 17px ${FF}`, wP: 210, wS: 172, lh: 28, lhs: 25, off: 32, room: 104, halo: 6 }
+             : { name: FONT.name, sname: FONT.sname, yr: FONT.yr, wP: 136, wS: 112, lh: 19, lhs: 17, off: 22, room: 64, halo: 0 };
+}
 
 /* ---------- shared tidy placement ---------- */
 function tidy(forest, slotW, spW, HG, TG) {
@@ -50,8 +56,8 @@ function tidy(forest, slotW, spW, HG, TG) {
 }
 
 /* ---------- organic tree: root at the bottom, curved branches ---------- */
-export function layoutTree(forest, P, colors) {
-  const R = 40, RS = 30, SLOT = 150, SPW = 116, HG = 18, TG = 160, V = 210;
+export function layoutTree(forest, P, colors, big = false) {
+  const R = big ? 50 : 40, RS = big ? 38 : 30, SLOT = big ? 230 : 150, SPW = big ? 190 : 116, HG = big ? 26 : 18, TG = 160, V = big ? 290 : 210;
   const W = tidy(forest, SLOT, SPW, HG, TG);
   const nodes = [], links = [], leaves = [];
   let maxD = 0;
@@ -67,7 +73,7 @@ export function layoutTree(forest, P, colors) {
     for (const c of n.children) {
       const kp = P(c.id); const o = kp.father === n.id ? kp.mother : kp.father; const si = n.spouses.findIndex(s => s.id === o);
       const ax = si < 0 ? cx : (cx + (W - (n.ux + SLOT + si * SPW + SPW / 2))) / 2, ay = cy - (si < 0 ? R - 6 : 6);
-      const chx = W - (c.ux + SLOT / 2), chy = yOf(c.depth) + R + 34;
+      const chx = W - (c.ux + SLOT / 2), chy = yOf(c.depth) + R + (big ? 92 : 34);
       const w = Math.max(3, 18 - n.depth * 2.8);
       links.push({ t: 'c', w, color: colors.get(c.id) || col, d: [['M', ax, ay], ['C', ax, ay - V * .5, chx, chy + V * .35, chx, chy]], a: n.id, b: c.id });
       const mx = (ax + chx) / 2, my = (ay + chy) / 2;
@@ -79,15 +85,15 @@ export function layoutTree(forest, P, colors) {
   // trunk + ground under every root
   const deco = [];
   for (const t of forest) { const n = nodes.find(x => x.id === t.id && x.kind === 'p'); if (!n) continue;
-    const by = n.y + R + 150;
+    const by = n.y + R + (big ? 190 : 150);
     deco.push({ t: 'trunk', x: n.x, y: n.y + R - 4, by, w: 30, color: colors.get(t.id) }); }
   const H = (maxD) * V + 60 + R + 190;
-  return finalize({ style: 'tree', nodes, links, leaves, deco, W, H });
+  return finalize({ style: 'tree', nodes, links, leaves, deco, W, H, lab: labelSpec(big) });
 }
 
 /* ---------- radial: ancestor in the centre, generations in rings ---------- */
-export function layoutRadial(forest, P, colors) {
-  const NODE = 146, SPN = 108, R0 = 56, RS = 30, STEP0 = 250;
+export function layoutRadial(forest, P, colors, big = false) {
+  const NODE = big ? 224 : 146, SPN = big ? 180 : 108, R0 = big ? 68 : 56, RS = big ? 38 : 30, RN = big ? 50 : 40, STEP0 = big ? 320 : 250;
   const single = forest.length === 1;
   let maxD = 0; const md = n => { maxD = Math.max(maxD, n.depth); if (!n.ref) n.children.forEach(md); }; forest.forEach(md);
   // ring radius grows linearly; each node needs enough angle for its own width at its ring,
@@ -104,7 +110,7 @@ export function layoutRadial(forest, P, colors) {
     const rootCentre = n.depth === 0 && single;
     const x = rootCentre ? 0 : r * Math.cos(mid), y = rootCentre ? 0 : r * Math.sin(mid), col = colors.get(n.id);
     n._x = x; n._y = y; n._a = mid;
-    nodes.push({ id: n.id, x, y, r: n.ref ? RS : n.depth === 0 ? R0 : 40, kind: n.ref ? 'ref' : 'p', depth: n.depth, color: col });
+    nodes.push({ id: n.id, x, y, r: n.ref ? RS : n.depth === 0 ? R0 : RN, kind: n.ref ? 'ref' : 'p', depth: n.depth, color: col });
     if (n.ref) return;
     n.spouses.forEach((s, i) => {
       let sx, sy;
@@ -126,21 +132,22 @@ export function layoutRadial(forest, P, colors) {
   };
   for (const t of forest) { place(t, a0); a0 += t.ang * spread; }
   const rings = Array.from({ length: maxD }, (_, i) => (i + 1) * step);
-  return finalize({ style: 'radial', nodes, links, rings, W: 0, H: 0 });
+  return finalize({ style: 'radial', nodes, links, rings, W: 0, H: 0, lab: labelSpec(big) });
 }
 
 /* ---------- classic cards (from the app's existing layout) ---------- */
-export function classicScene(L, colors) {
-  const nodes = L.cards.map(c => ({ id: c.id, x: c.x + 74, y: c.y + 89, w: 148, h: 178, kind: c.kind, depth: c.depth, color: colors.get(c.id) }));
+export function classicScene(L, colors, big = false) {
+  const cw = L.dims?.CW || 148, ch = L.dims?.CH || 178;
+  const nodes = L.cards.map(c => ({ id: c.id, x: c.x + cw / 2, y: c.y + ch / 2, w: cw, h: ch, kind: c.kind, depth: c.depth, color: colors.get(c.id) }));
   const links = L.links.map(l => l.t === 'm' ? { t: 'm', d: [['M', l.x1, l.y], ['L', l.x2, l.y]] } : { t: 'c', w: 2, d: [['M', l.ax, l.ay], ['L', l.ax, l.by], ['L', l.cx, l.by], ['L', l.cx, l.cy]] });
-  return finalize({ style: 'classic', nodes, links, W: L.W, H: L.H });
+  return finalize({ style: 'classic', nodes, links, W: L.W, H: L.H, lab: labelSpec(big) });
 }
 
 /* normalise to a bounding box starting at 0,0 (with room for labels) */
 function finalize(sc) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const n of sc.nodes) {
-    const hw = n.w ? n.w / 2 : Math.max(n.r, 74), top = n.h ? n.h / 2 : n.r, bot = n.h ? n.h / 2 : n.r + 64;
+    const lab = sc.lab || labelSpec(false); const hw = n.w ? n.w / 2 : Math.max(n.r, lab.wP / 2 + 4), top = n.h ? n.h / 2 : n.r, bot = n.h ? n.h / 2 : n.r + lab.room;
     minX = Math.min(minX, n.x - hw); maxX = Math.max(maxX, n.x + hw); minY = Math.min(minY, n.y - top); maxY = Math.max(maxY, n.y + bot);
   }
   for (const d of sc.deco || []) maxY = Math.max(maxY, d.by + 20);
@@ -212,7 +219,7 @@ export function renderSVG(sc, { P, img, yearsTxt, sel, hl, theme }) {
 
 /* ---------- canvas renderer (export/poster) ---------- */
 export function drawScene(g, sc, { P, imgOf, yearsTxt, theme }) {
-  const T = theme;
+  const T = theme, lab = sc.lab || labelSpec(false);
   g.lineCap = 'round'; g.lineJoin = 'round';
   if (sc.rings) { g.save(); g.beginPath(); g.rect(0, 0, sc.W, sc.H); g.clip(); g.strokeStyle = T.ring; g.lineWidth = 1.5; g.setLineDash([3, 9]); for (const r of sc.rings) { g.beginPath(); g.arc(sc.center.x, sc.center.y, r, 0, Math.PI * 2); g.stroke(); } g.setLineDash([]); g.restore(); }
   for (const d of sc.deco || []) {
@@ -231,25 +238,34 @@ export function drawScene(g, sc, { P, imgOf, yearsTxt, theme }) {
   for (const n of sc.nodes) {
     const p = P(n.id); if (!p) continue;
     const im = imgOf(p), ghost = n.kind === 'ref' || n.kind === 'dup';
-    if (sc.style === 'classic') { drawCard(g, n, p, im, yearsTxt, T, ghost); continue; }
+    if (sc.style === 'classic') { drawCard(g, n, p, im, yearsTxt, T, ghost, lab); continue; }
     g.save(); g.shadowColor = T.shadow; g.shadowBlur = 10; g.shadowOffsetY = 2;
     g.beginPath(); g.arc(n.x, n.y, n.r + 6, 0, Math.PI * 2); g.fillStyle = T.halo; g.fill(); g.restore();
     if (im) { g.save(); g.beginPath(); g.arc(n.x, n.y, n.r, 0, Math.PI * 2); g.clip(); if (p.deceased) g.filter = 'grayscale(1)'; g.drawImage(im, n.x - n.r, n.y - n.r, n.r * 2, n.r * 2); g.restore(); }
     g.beginPath(); g.arc(n.x, n.y, n.r + 1, 0, Math.PI * 2); g.strokeStyle = p.deceased ? T.dec : n.color; g.lineWidth = 3.5; if (ghost) g.setLineDash([5, 4]); g.stroke(); g.setLineDash([]);
-    const small = n.kind !== 'p'; const f = small ? FONT.sname : FONT.name; g.font = f; g.fillStyle = T.ink;
-    const lines = wrapLines(p.name, small ? 112 : 136, f); lines.forEach((ln, i) => g.fillText(ln, n.x, n.y + n.r + 22 + i * (small ? 17 : 19)));
-    const yt = yearsTxt(p); if (yt) { g.font = FONT.yr; g.fillStyle = T.muted; g.fillText(yt, n.x, n.y + n.r + 22 + lines.length * (small ? 17 : 19) + 1); }
+    const small = n.kind !== 'p', f = small ? lab.sname : lab.name, lh = small ? lab.lhs : lab.lh;
+    const lines = wrapLines(p.name, small ? lab.wS : lab.wP, f);
+    const yt = yearsTxt(p);
+    label(g, lines, f, T.ink, n.x, n.y + n.r + lab.off, lh, lab.halo, T);
+    if (yt) label(g, [yt], lab.yr, T.muted, n.x, n.y + n.r + lab.off + lines.length * lh + 1, lh, lab.halo, T);
   }
 }
 function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
-function drawCard(g, n, p, im, yearsTxt, T, ghost) {
-  const x = n.x - n.w / 2, y = n.y - n.h / 2;
-  g.save(); g.shadowColor = T.shadow; g.shadowBlur = 12; g.shadowOffsetY = 3; rr(g, x, y, n.w, n.h, 18); g.fillStyle = T.card; g.fill(); g.restore();
-  g.save(); rr(g, x, y, n.w, n.h, 18); g.clip(); g.fillStyle = p.deceased ? T.dec : n.color; g.fillRect(x, y, n.w, 6); g.restore();
-  rr(g, x, y, n.w, n.h, 18); g.strokeStyle = T.border; g.lineWidth = 1.5; if (ghost) g.setLineDash([6, 5]); g.stroke(); g.setLineDash([]);
-  const cx = n.x, cy = y + 16 + 34;
-  if (im) { g.save(); g.beginPath(); g.arc(cx, cy, 34, 0, Math.PI * 2); g.clip(); if (p.deceased) g.filter = 'grayscale(1)'; g.drawImage(im, cx - 34, cy - 34, 68, 68); g.restore(); }
-  g.beginPath(); g.arc(cx, cy, 35, 0, Math.PI * 2); g.strokeStyle = p.deceased ? T.dec : n.color; g.lineWidth = 3; g.stroke();
-  g.fillStyle = T.ink; g.font = FONT.name; wrapLines(p.name, n.w - 16, FONT.name).forEach((ln, i) => g.fillText(ln, cx, y + 112 + i * 20));
-  const yt = yearsTxt(p); if (yt) { g.fillStyle = T.muted; g.font = FONT.yr; g.fillText(yt, cx, y + n.h - 14); }
+function label(g, lines, font, color, x, y, lh, halo, T) {
+  g.font = font;
+  lines.forEach((ln, i) => { const yy = y + i * lh;
+    if (halo) { g.lineJoin = 'round'; g.lineWidth = halo; g.strokeStyle = T.textHalo || T.bg; g.strokeText(ln, x, yy); }
+    g.fillStyle = color; g.fillText(ln, x, yy); });
+}
+function drawCard(g, n, p, im, yearsTxt, T, ghost, lab) {
+  const x = n.x - n.w / 2, y = n.y - n.h / 2, k = n.w / 148, ar = 34 * Math.min(k, 1.2);
+  g.save(); g.shadowColor = T.shadow; g.shadowBlur = 12; g.shadowOffsetY = 3; rr(g, x, y, n.w, n.h, 18 * k); g.fillStyle = T.card; g.fill(); g.restore();
+  g.save(); rr(g, x, y, n.w, n.h, 18 * k); g.clip(); g.fillStyle = p.deceased ? T.dec : n.color; g.fillRect(x, y, n.w, 7 * k); g.restore();
+  rr(g, x, y, n.w, n.h, 18 * k); g.strokeStyle = T.border; g.lineWidth = 1.5; if (ghost) g.setLineDash([6, 5]); g.stroke(); g.setLineDash([]);
+  const cx = n.x, cy = y + 16 * k + ar;
+  if (im) { g.save(); g.beginPath(); g.arc(cx, cy, ar, 0, Math.PI * 2); g.clip(); if (p.deceased) g.filter = 'grayscale(1)'; g.drawImage(im, cx - ar, cy - ar, ar * 2, ar * 2); g.restore(); }
+  g.beginPath(); g.arc(cx, cy, ar + 1, 0, Math.PI * 2); g.strokeStyle = p.deceased ? T.dec : n.color; g.lineWidth = 3; g.stroke();
+  const lines = wrapLines(p.name, n.w - 14, lab.name);
+  label(g, lines, lab.name, T.ink, cx, cy + ar + lab.off + 4, lab.lh, 0, T);
+  const yt = yearsTxt(p); if (yt) label(g, [yt], lab.yr, T.muted, cx, y + n.h - 14 * k, lab.lh, 0, T);
 }

@@ -11,9 +11,9 @@ export const THEMES = {
 function mix(a, b, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v * (1 - t) + B[i] * t).toString(16).padStart(2, '0')).join(''); }
 
 export const QUALITY = [
-  { id: 'hd', label: 'واضحة', scale: 1.4, max: 8000, hint: 'مناسبة لواتساب' },
-  { id: 'xhd', label: 'عالية جداً', scale: 2.4, max: 14000, hint: 'تقرب وتشوف كل اسم' },
-  { id: 'print', label: 'للطباعة', scale: 3.5, max: 20000, hint: 'لوحة كبيرة' },
+  { id: 'hd', label: 'واضحة', scale: 2, max: 10000, hint: 'لواتساب: ابعتها كمستند عشان متتضغطش' },
+  { id: 'xhd', label: 'عالية جداً', scale: 3, max: 16000, hint: 'تقرب وتشوف كل اسم' },
+  { id: 'print', label: 'للطباعة', scale: 4.5, max: 24000, hint: 'لوحة كبيرة، الملف تقيل' },
 ];
 // scale so names stay a readable size, capped so the file stays openable
 export function posterDims(L, q, cap) { const s = Math.min(q.scale, (cap || q.max) / Math.max(L.W, L.H)); return { s, W: Math.round(L.W * s), H: Math.round(L.H * s) }; }

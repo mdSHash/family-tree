@@ -281,7 +281,7 @@ dialog::backdrop{background:rgba(10,18,15,.45)}
 
 /* ---------- globe ---------- */
 #globe{position:absolute;inset:0;touch-action:none;cursor:grab;display:block}
-.ghint{position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 12px;border-radius:99px;z-index:4;pointer-events:none;white-space:nowrap}
+.ghint{position:absolute;top:62px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 12px;border-radius:99px;z-index:4;pointer-events:none;white-space:nowrap}
 
 /* ---------- view switcher + legend ---------- */
 .viewbar{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;z-index:5}
@@ -304,3 +304,27 @@ dialog::backdrop{background:rgba(10,18,15,.45)}
 .seg button{white-space:nowrap}
 .prog{height:6px;border-radius:9px;background:var(--surface-2);overflow:hidden}
 .prog div{height:100%;width:0;background:var(--brand);transition:width .2s}
+
+/* ---------- theme toggle ---------- */
+.themebtn svg{overflow:visible}
+.themebtn .sun,.themebtn .moon{transform-origin:12px 12px;transition:transform .55s cubic-bezier(.5,1.6,.4,1),opacity .35s}
+.themebtn .moon{opacity:0;transform:rotate(-90deg) scale(.4);fill:currentColor;stroke:none}
+:root[data-theme="dark"] .themebtn .sun{opacity:0;transform:rotate(90deg) scale(.4)}
+:root[data-theme="dark"] .themebtn .moon{opacity:1;transform:none}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .themebtn .sun{opacity:0;transform:rotate(90deg) scale(.4)} :root:not([data-theme="light"]) .themebtn .moon{opacity:1;transform:none} }
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-old(root){z-index:1} ::view-transition-new(root){z-index:2}
+html.theme-anim *{transition:background-color .45s ease,border-color .45s ease,color .45s ease,fill .45s ease!important}
+
+/* ---------- install bar ---------- */
+.instbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:7;display:flex;align-items:center;background:var(--brand);color:var(--brand-ink);border-radius:99px;box-shadow:var(--shadow);max-width:calc(100% - 32px);animation:instIn .5s cubic-bezier(.2,.9,.3,1.2)}
+.inst-go{display:flex;align-items:center;gap:8px;border:0;background:none;color:inherit;font-weight:600;font-size:13.5px;padding:9px 4px 9px 14px;white-space:nowrap}
+.inst-go svg{width:20px;height:20px}
+.inst-x{border:0;background:none;color:inherit;opacity:.7;font-size:20px;line-height:1;padding:6px 12px 6px 8px}
+@keyframes instIn{from{opacity:0;transform:translate(-50%,-14px)}}
+.inst-steps{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;counter-reset:st}
+.inst-steps li{display:flex;gap:12px;align-items:center;background:var(--surface-2);border-radius:14px;padding:12px;line-height:1.7;counter-increment:st}
+.inst-steps li::before{content:counter(st);flex:none;width:28px;height:28px;border-radius:50%;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-weight:700;font-size:13px}
+.inst-steps svg{width:22px;height:22px;vertical-align:-6px;color:var(--accent)}
+.inst-hero{display:flex;align-items:center;gap:14px}
+.inst-hero img{width:64px;height:64px;border-radius:16px;box-shadow:var(--shadow)}

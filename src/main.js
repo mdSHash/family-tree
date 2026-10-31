@@ -2,7 +2,7 @@ import './style.css';
 import { api, ls, outbox, liveChannel, configured } from './api.js';
 import { registerSW } from 'virtual:pwa-register';
 import { avatarURL, ageGroup } from './avatars.js';
-import { colorMap, legendFor, layoutTree, layoutRadial, classicScene, renderSVG } from './scene.js';
+import { colorMap, legendFor, layoutTree, layoutRadial, classicScene, renderSVG, branchPoint, firstName } from './scene.js';
 import { Globe } from './globe.js';
 import { THEMES, QUALITY, posterLayout, drawPoster, renderPNG, posterDims } from './poster.js';
 
@@ -42,13 +42,14 @@ function pickRoots(){
   roots.sort((a,b)=>sc.get(b)-sc.get(a)||((isF(P(a))?1:0)-(isF(P(b))?1:0))||byBirth(a,b));
   return roots;
 }
-function unitW(n){ return n.ref?CW:(1+n.spouses.length)*CW+n.spouses.length*SG; }
+let D={CW,CH,SG,HG,VG,TG};
+function unitW(n){ return n.ref?D.CW:(1+n.spouses.length)*D.CW+n.spouses.length*D.SG; }
 function measure(n){ const uw=unitW(n); if(n.ref||!n.children.length){ n.w=uw; return uw; }
-  n.cw=n.children.reduce((s,c)=>s+measure(c),0)+HG*(n.children.length-1); n.w=Math.max(uw,n.cw); return n.w; }
+  n.cw=n.children.reduce((s,c)=>s+measure(c),0)+D.HG*(n.children.length-1); n.w=Math.max(uw,n.cw); return n.w; }
 function place(n,x,y){ n.y=y; n.ux=x+(n.w-unitW(n))/2;
-  if(!n.ref&&n.children.length){ let cx=x+(n.w-n.cw)/2; for(const c of n.children){ place(c,cx,y+CH+VG); cx+=c.w+HG; } } }
-function layout(){
-  index();
+  if(!n.ref&&n.children.length){ let cx=x+(n.w-n.cw)/2; for(const c of n.children){ place(c,cx,y+D.CH+D.VG); cx+=c.w+D.HG; } } }
+function layout(dims,rootId){
+  index(); D=dims||{CW,CH,SG,HG,VG,TG}; const {CW:cW,CH:cH,SG:sG,VG:vG,TG:tG}=D;
   const placed=new Set(),shown=new Set();
   function build(id,depth){
     placed.add(id); shown.add(id);
@@ -60,24 +61,24 @@ function layout(){
     for(const k of kids){ if(placed.has(k)) continue; if(shown.has(k)) n.children.push({ref:true,id:k,depth:depth+1}); else n.children.push(build(k,depth+1)); }
     return n;
   }
-  const forest=[]; for(const r of pickRoots()){ if(shown.has(r)) continue; forest.push(build(r,0)); }
-  let x=0; for(const t of forest){ measure(t); place(t,x,0); x+=t.w+TG; }
-  const W=Math.max(CW,x-TG),cards=[],links=[]; let maxY=CH,maxD=0;
+  const forest=[]; for(const r of (rootId?[rootId]:pickRoots())){ if(shown.has(r)) continue; forest.push(build(r,0)); }
+  let x=0; for(const t of forest){ measure(t); place(t,x,0); x+=t.w+tG; }
+  const W=Math.max(cW,x-tG),cards=[],links=[]; let maxY=cH,maxD=0;
   function collect(n){
-    maxY=Math.max(maxY,n.y+CH); maxD=Math.max(maxD,n.depth);
+    maxY=Math.max(maxY,n.y+cH); maxD=Math.max(maxD,n.depth);
     if(n.ref){ cards.push({id:n.id,x:n.ux,y:n.y,kind:'ref',depth:n.depth}); return; }
     cards.push({id:n.id,x:n.ux,y:n.y,kind:'p',depth:n.depth});
-    n.spouses.forEach((s,i)=>{ const sx=n.ux+(i+1)*(CW+SG); cards.push({id:s.id,x:sx,y:n.y,kind:s.dup?'dup':'sp',of:n.id,depth:n.depth});
-      links.push({t:'m',x1:n.ux+i*(CW+SG)+CW,x2:sx,y:n.y+CH*.42,a:n.id,b:s.id}); });
+    n.spouses.forEach((s,i)=>{ const sx=n.ux+(i+1)*(cW+sG); cards.push({id:s.id,x:sx,y:n.y,kind:s.dup?'dup':'sp',of:n.id,depth:n.depth});
+      links.push({t:'m',x1:n.ux+i*(cW+sG)+cW,x2:sx,y:n.y+cH*.42,a:n.id,b:s.id}); });
     for(const c of n.children){ const kp=P(c.id); const o=kp.father===n.id?kp.mother:kp.father; const i=n.spouses.findIndex(s=>s.id===o);
-      const ax=i<0?n.ux+CW/2:n.ux+(i+1)*(CW+SG)-SG/2, ay=i<0?n.y+CH:n.y+CH*.42;
-      links.push({t:'c',ax,ay,by:n.y+CH+VG/2,cx:c.ux+CW/2,cy:c.y,a:n.id,b:c.id,o}); collect(c); }
+      const ax=i<0?n.ux+cW/2:n.ux+(i+1)*(cW+sG)-sG/2, ay=i<0?n.y+cH:n.y+cH*.42;
+      links.push({t:'c',ax,ay,by:n.y+cH+vG/2,cx:c.ux+cW/2,cy:c.y,a:n.id,b:c.id,o}); collect(c); }
   }
   forest.forEach(collect);
-  cards.forEach(c=>c.x=W-c.x-CW);
+  cards.forEach(c=>c.x=W-c.x-cW);
   links.forEach(l=>{ if(l.t==='m'){ const a=W-l.x1,b=W-l.x2; l.x1=Math.min(a,b); l.x2=Math.max(a,b); } else { l.ax=W-l.ax; l.cx=W-l.cx; } });
   const pos=new Map(); for(const c of cards){ if(c.kind==='p') pos.set(c.id,c); } for(const c of cards){ if(c.kind==='sp'&&!pos.has(c.id)) pos.set(c.id,c); }
-  return {cards,links,W,H:maxY,pos,gens:cards.length?maxD+1:0,forest};
+  const out={cards,links,W,H:maxY,pos,gens:cards.length?maxD+1:0,forest,dims:D}; D={CW,CH,SG,HG,VG,TG}; return out;
 }
 
 /* ---------- render ---------- */
@@ -457,7 +458,20 @@ async function preloadImages(ids){ const m=new Map(), byUrl=new Map();
     if(!im&&p.photo){ const a=avatarURL(p.gender==='f'?'f':'m',ageGroup(p,kidsOf)); if(!byUrl.has(a)) byUrl.set(a,loadImg(a)); im=await byUrl.get(a); }
     m.set(id,im); }));
   return m; }
-let lastPoster={style:null,theme:'paper',quality:'xhd',legend:true};
+let lastPoster={style:null,theme:'paper',quality:'xhd',legend:true,split:false};
+const POSTER_DIMS={CW:206,CH:248,SG:22,HG:30,VG:100,TG:150};
+function posterBranches(){ if(!S.forest?.length||S.focus) return [];
+  const size=n=>n.ref?1:1+n.spouses.length+n.children.reduce((a,c)=>a+size(c),0);
+  const out=[]; const take=n=>{ const sz=size(n); if(sz<3) return; const kids=n.children.filter(c=>!c.ref&&size(c)>=3);
+    if(sz>36&&kids.length>1) kids.forEach(take); else out.push(n.id); };
+  const bp=branchPoint(S.forest[0]); (bp?.children||[]).filter(c=>!c.ref).forEach(take); return out; }
+async function offerFiles(files){
+  if(files.length===1) return offer(files[0].name,files[0]);
+  const mobile=matchMedia('(pointer:coarse)').matches;
+  if(mobile&&navigator.canShare?.({files})){ try{ await navigator.share({files,title:famTitle()}); return; }catch(e){ if(e?.name==='AbortError') return; } }
+  for(const f of files){ const url=URL.createObjectURL(f); const a=document.createElement('a'); a.href=url; a.download=f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),8000); await new Promise(r=>setTimeout(r,400)); }
+  toast(`اتنزّلت ${AR(files.length)} صور`);
+}
 $('#bExport').onclick=()=>{
   if(!S.people.size){ toast('ضيف أفراد الأول'); return; }
   const st=lastPoster.style||(S.view==='globe'?'radial':S.view);
@@ -470,15 +484,19 @@ $('#bExport').onclick=()=>{
       <div class="fld"><label for="pSub">سطر تحت العنوان (اختياري)</label><input type="text" id="pSub" value="${esc(`${AR(S.people.size)} فرد  ،  ${AR(gens)} أجيال`)}" maxlength="80"></div>
       <div class="fld"><span class="lbl">الجودة</span><div class="seg" id="pQ">${QUALITY.map(q=>`<button type="button" data-k="${q.id}" class="${lastPoster.quality===q.id?'on':''}">${q.label}</button>`).join('')}</div><span class="hint" id="pQhint"></span></div>
       ${S.colorMode!=='gender'?`<label class="check"><input type="checkbox" id="pLegend" ${lastPoster.legend?'checked':''}> اكتب دليل الألوان تحت العنوان</label>`:''}
+      ${posterBranches().length>1?`<label class="check"><input type="checkbox" id="pSplit" ${lastPoster.split?'checked':''}> صورة لكل فرع (${AR(posterBranches().length)} صور) عشان الأسامي تبقى كبيرة</label>`:''}
       <div class="prog" id="pProg" hidden><div></div></div><p class="hint" id="pMsg"></p>
     </div>
     <div class="dlg-f"><button class="btn pri" id="pPng">صورة PNG</button><button class="btn" id="pPdf">PDF</button><button class="btn" data-close>إلغاء</button></div>`);
   const pick=(id,key)=>$('#'+id).querySelectorAll('button').forEach(b=>b.onclick=()=>{ lastPoster[key]=b.dataset.k; $('#'+id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); hint(); });
   lastPoster.style=st; pick('pStyle','style'); pick('pTheme','theme'); pick('pQ','quality');
-  function build(){ const style=lastPoster.style; const colors=S.colors;
-    const sc=style==='classic'?classicScene(S.lay.classic||layout(),colors):(style==='tree'?layoutTree:layoutRadial)(S.forest,P,colors);
-    const legend=S.colorMode!=='gender'&&$('#pLegend')?.checked?legendFor(S.forest,S.colorMode,P):null;
-    const L=posterLayout(sc,{title:$('#pTitle').value.trim()||famTitle(),subtitle:$('#pSub').value.trim(),legend});
+  function sceneFor(rootId){ const style=lastPoster.style, colors=S.colors;
+    if(style==='classic') return classicScene(layout(POSTER_DIMS,rootId),colors,true);
+    const forest=rootId?layout(null,rootId).forest:S.forest; return (style==='tree'?layoutTree:layoutRadial)(forest,P,colors,true); }
+  function build(rootId){ const sc=sceneFor(rootId||(S.focus&&P(S.focus)?S.focus:null));
+    const legend=S.colorMode!=='gender'&&$('#pLegend')?.checked&&!rootId?legendFor(S.forest,S.colorMode,P):null;
+    const base=$('#pTitle').value.trim()||famTitle();
+    const L=posterLayout(sc,{title:rootId?`${base}  ،  فرع ${firstName(P(rootId).name)}`:base,subtitle:rootId?'':$('#pSub').value.trim(),legend});
     return {sc,L}; }
   function hint(){ try{ const {L}=build(); const q=QUALITY.find(q=>q.id===lastPoster.quality); const d=posterDims(L,q); $('#pQhint').textContent=`${q.hint}، ${AR(d.W)}×${AR(d.H)} بكسل`; }catch{} }
   hint();
@@ -486,22 +504,30 @@ $('#bExport').onclick=()=>{
     const btns=[$('#pPng'),$('#pPdf')]; btns.forEach(b=>b.disabled=true); const prog=$('#pProg'), bar=prog.firstElementChild; prog.hidden=false; $('#pMsg').textContent='بنجهّز الصورة…';
     try{
       try{ await Promise.all(['600 15px "Readex Pro"','500 13px "Readex Pro"','400 12px "Readex Pro"','700 40px "Aref Ruqaa"'].map(f=>document.fonts.load(f))); }catch{}
-      const {sc,L}=build(); const T=THEMES[lastPoster.theme]; const imgs=await preloadImages(new Set(sc.nodes.map(n=>n.id)));
-      const ctx={P,imgOf:p=>imgs.get(p.id),yearsTxt,meta:'',foot:`اتعملت بتطبيق شجرة العيلة  ،  ${new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long'})}`};
-      const q=QUALITY.find(q=>q.id===lastPoster.quality); const d=posterDims(L,q,fmt==='pdf'?7000:null);
-      const name=($('#pTitle').value.trim()||famTitle()).replace(/\s+/g,'-');
-      if(fmt==='png'){
-        const blob=await renderPNG({W:d.W,H:d.H,draw:g=>{ g.scale(d.s,d.s); drawPoster(g,sc,L,T,ctx); },onProgress:f=>bar.style.width=(f*100).toFixed(0)+'%'});
-        dlg.close(); await offer(name+'.png',blob);
-      } else {
-        const cv=document.createElement('canvas'); cv.width=d.W; cv.height=d.H; const g=cv.getContext('2d'); g.scale(d.s,d.s); drawPoster(g,sc,L,T,ctx); bar.style.width='70%';
-        const {jsPDF}=await import('jspdf'); const k=Math.min(1,14000/Math.max(d.W,d.H)); const w=d.W*k,h=d.H*k;
-        const doc=new jsPDF({orientation:w>h?'l':'p',unit:'px',format:[w,h],hotfixes:['px_scaling'],compress:true});
-        doc.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,w,h); const blob=doc.output('blob'); dlg.close(); await offer(name+'.pdf',blob);
+      const T=THEMES[lastPoster.theme]; const q=QUALITY.find(q=>q.id===lastPoster.quality);
+      const roots=$('#pSplit')?.checked?posterBranches():[null];
+      const files=[]; const baseName=($('#pTitle').value.trim()||famTitle()).replace(/\s+/g,'-');
+      for(let i=0;i<roots.length;i++){
+        const rid=roots[i]; const {sc,L}=build(rid); const imgs=await preloadImages(new Set(sc.nodes.map(n=>n.id)));
+        const ctx={P,imgOf:p=>imgs.get(p.id),yearsTxt,meta:'',foot:`اتعملت بتطبيق شجرة العيلة  ،  ${new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long'})}`};
+        const d=posterDims(L,q,fmt==='pdf'?9000:null); const name=baseName+(rid?'-'+firstName(P(rid).name).replace(/\s+/g,'-'):'');
+        if(roots.length>1) $('#pMsg').textContent=`بنجهّز صورة ${AR(i+1)} من ${AR(roots.length)}…`;
+        const prog=f=>bar.style.width=(((i+f)/roots.length)*100).toFixed(0)+'%';
+        if(fmt==='png'){
+          files.push(new File([await renderPNG({W:d.W,H:d.H,draw:g=>{ g.scale(d.s,d.s); drawPoster(g,sc,L,T,ctx); },onProgress:prog})],name+'.png',{type:'image/png'}));
+        } else {
+          const cv=document.createElement('canvas'); cv.width=d.W; cv.height=d.H; const g=cv.getContext('2d'); g.scale(d.s,d.s); drawPoster(g,sc,L,T,ctx); prog(.8);
+          const {jsPDF}=await import('jspdf'); const k=Math.min(1,14000/Math.max(d.W,d.H)); const w=d.W*k,h=d.H*k;
+          const doc=new jsPDF({orientation:w>h?'l':'p',unit:'px',format:[w,h],hotfixes:['px_scaling'],compress:true});
+          doc.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,w,h); files.push(new File([doc.output('blob')],name+'.pdf',{type:'application/pdf'}));
+          cv.width=cv.height=1;
+        }
       }
+      dlg.close(); await offerFiles(files);
     }catch(err){ console.warn(err); $('#pMsg').textContent='الصورة ماطلعتش. جرّب جودة أقل.'; btns.forEach(b=>b.disabled=false); prog.hidden=true; }
   }
   $('#pPng').onclick=()=>go('png'); $('#pPdf').onclick=()=>go('pdf');
+  $('#pSplit')?.addEventListener('change',e=>{ lastPoster.split=e.target.checked; });
 };
 
 /* ---------- demo ---------- */
@@ -545,14 +571,14 @@ $('#bMenu').onclick=()=>{
       ${w?`<div class="fld"><label for="sFam">اسم العيلة</label><div class="linkbox"><input type="text" id="sFam" value="${esc(S.meta.name||'')}" placeholder="مثلاً: عبد الرحمن" maxlength="40" style="direction:rtl;font-size:14px"><button class="btn pri" id="sSave">حفظ</button></div></div>`:''}
       <div class="fld"><div class="role-t"><span class="dot v"></span>لينك المشاهدة</div><p class="hint" style="margin:0">اللي معاه اللينك ده يشوف الشجرة بس.</p>${linkRow('lnkV',linkFor(S.viewCode),'شوف شجرة '+famTitle())}</div>
       ${w&&S.editCode?`<div class="fld"><div class="role-t"><span class="dot"></span>لينك التعديل</div><p class="hint" style="margin:0">اللي معاه اللينك ده يقدر يضيف ويعدّل ويمسح. ابعته للي بتثق فيهم بس.</p>${linkRow('lnkE',linkFor(S.editCode),'ساعدني نكمّل شجرة '+famTitle())}</div>`:''}
-      ${standalone?'':`<div><p class="sec-t">نزّلها على الموبايل</p>${installEvt?'<button class="btn" id="bInstall">ثبّت التطبيق</button>':`<p class="hint">${isIOS?'من Safari دوس زرار المشاركة وبعدين "Add to Home Screen".':'من قايمة المتصفح اختار "تثبيت التطبيق" أو "Add to Home screen".'}</p>`}</div>`}
+      ${standalone?'':`<div><p class="sec-t">على الموبايل زي التطبيق</p><button class="btn pri" id="bInstall">نزّل التطبيق</button></div>`}
       <div><p class="sec-t">نسخة احتياطية</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="bkOut">نزّل نسخة احتياطية</button>${w?'<button class="btn" id="bkIn">استرجع من نسخة</button>':''}</div><p class="hint" id="bkMsg"></p></div>
       <div><button class="btn" id="bOther">افتح شجرة تانية / اعمل جديدة</button></div>
     </div>`);
   $('#dlgIn').querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ const i=$('#'+b.dataset.copy); i.select(); copy(i.value); });
   $('#dlgIn').querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>shareLink($('#'+b.dataset.share).value,b.dataset.label));
   $('#sSave')?.addEventListener('click',()=>{ const v=$('#sFam').value.trim(); S.meta={...S.meta,name:v}; render(); OB.push({t:'name',name:v}); cacheSave(); flush(); recent.add({code:S.code,name:v,role:S.role}); toast('اتحفظ'); });
-  $('#bInstall')?.addEventListener('click',async()=>{ installEvt.prompt(); await installEvt.userChoice; installEvt=null; dlg.close(); });
+  $('#bInstall')?.addEventListener('click',()=>openInstall());
   $('#bkOut').onclick=()=>{ const j=JSON.stringify({app:'family-tree',v:1,meta:S.meta,people:[...S.real.values()]},null,1); offer('family-tree-backup.json',new Blob([j],{type:'application/json'})); };
   $('#bkIn')?.addEventListener('click',()=>$('#fileImport').click());
   $('#bOther').onclick=()=>{ dlg.close(); showLanding(); };
@@ -590,6 +616,7 @@ function showLanding(){
       <li><b>صورة أو PDF</b>طلّع الشجرة كاملة وابعتها على واتساب.</li>
     </ul>
     <button class="btn" id="lDemo">شوف مثال جاهز</button>
+    ${standalone?'':'<button class="btn pri" id="lInstall">نزّل التطبيق على موبايلك</button>'}
   </div>`;
   L.querySelectorAll('[data-code]').forEach(b=>b.onclick=()=>openTree(b.dataset.code));
   $('#lCreate').onclick=async()=>{ const b=$('#lCreate'); b.disabled=true; b.textContent='لحظة…';
@@ -597,6 +624,7 @@ function showLanding(){
     catch(e){ toast(e.code==='offline'?'محتاج نت عشان تعمل شجرة جديدة':'حصلت مشكلة، جرّب تاني'); b.disabled=false; b.textContent='ابدأ'; } };
   $('#lName').onkeydown=e=>{ if(e.key==='Enter') $('#lCreate').click(); };
   $('#lOpen').onclick=()=>{ const c=extractCode($('#lCode').value); if(!c){ $('#lErr').hidden=false; return; } openTree(c); };
+  $('#lInstall')?.addEventListener('click',()=>openInstall());
   $('#lDemo').onclick=()=>{ L.hidden=true; $('#app').hidden=false; S.canWrite=true; enterDemo(); };
 }
 
@@ -627,7 +655,7 @@ async function openTree(code,fresh=false){
     if(!t){ recent.drop(code); ls.del('ft-last'); toast('اللينك ده مش شغال. ممكن يكون اتغيّر.'); showLanding(); return; }
     applyServer(t); S.mode='ready'; S.loaded=true; cacheSave(); recent.add({code,name:t.name,role:t.role});
     render(); if(!didFit&&S.people.size){ didFit=true; fit(false); }
-    LIVE=liveChannel(t.id,nudge); flush();
+    LIVE=liveChannel(t.id,nudge); flush(); showInstallBar();
     if(fresh) setTimeout(()=>openForm({mode:'add'}),300);
   }catch(e){ if(!c){ S.mode='unreachable'; render(); } updateNet(); }
 }
@@ -777,3 +805,52 @@ registerSW({immediate:true});
 apply();
 { const fromUrl=extractCode(location.search)||extractCode(location.hash); const last=ls.get('ft-last',null);
   if(fromUrl) openTree(fromUrl); else if(last) openTree(last); else showLanding(); }
+
+/* ---------- light / dark with a sunrise-sunset reveal ---------- */
+const mqDark=matchMedia('(prefers-color-scheme: dark)');
+const effTheme=()=>document.documentElement.dataset.theme||(mqDark.matches?'dark':'light');
+function setThemeColor(){ const m=document.querySelector('meta[name="theme-color"]'); if(m) m.content=effTheme()==='dark'?'#0E1412':'#1F3A31'; }
+{ const t=ls.get('ft-theme',null); if(t==='dark'||t==='light') document.documentElement.dataset.theme=t; setThemeColor(); }
+function applyTheme(t){ document.documentElement.dataset.theme=t; ls.set('ft-theme',t); setThemeColor(); if(S.view==='globe'&&G_.globe){ G_.globe.theme=globeTheme(); G_.globe.draw(); } }
+$('#bTheme').onclick=e=>{
+  const next=effTheme()==='dark'?'light':'dark'; const btn=e.currentTarget.getBoundingClientRect();
+  const x=btn.left+btn.width/2, y=btn.top+btn.height/2, R=Math.hypot(Math.max(x,innerWidth-x),Math.max(y,innerHeight-y));
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!document.startViewTransition||reduce){ const h=document.documentElement; h.classList.add('theme-anim'); applyTheme(next); setTimeout(()=>h.classList.remove('theme-anim'),500); return; }
+  const tr=document.startViewTransition(()=>applyTheme(next));
+  tr.ready.then(()=>{
+    // night falls from the button outward; morning rises the same way, with a soft edge
+    document.documentElement.animate({clipPath:[`circle(0px at ${x}px ${y}px)`,`circle(${R}px at ${x}px ${y}px)`]},{duration:700,easing:'cubic-bezier(.65,0,.25,1)',pseudoElement:'::view-transition-new(root)'});
+    document.documentElement.animate({filter:[next==='dark'?'brightness(1)':'brightness(.85)',next==='dark'?'brightness(.75)':'brightness(1)']},{duration:700,easing:'ease-out',pseudoElement:'::view-transition-old(root)'});
+  }).catch(()=>{});
+};
+mqDark.addEventListener('change',()=>{ setThemeColor(); if(S.view==='globe'&&G_.globe){ G_.globe.theme=globeTheme(); G_.globe.draw(); } });
+
+/* ---------- install the app ---------- */
+const UA=navigator.userAgent;
+const inApp=/FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|TikTok|; wv\)/i.test(UA);
+const isAndroid=/Android/i.test(UA), isSafari=isIOS&&/Safari/i.test(UA)&&!/CriOS|FxiOS|EdgiOS/i.test(UA);
+function showInstallBar(){ const dismissed=ls.get('ft-inst-x',0); $('#instBar').hidden=standalone||(Date.now()-dismissed<5*864e5)||!S.code; }
+$('#instX').onclick=()=>{ ls.set('ft-inst-x',Date.now()); $('#instBar').hidden=true; };
+$('#instGo').onclick=()=>openInstall();
+addEventListener('appinstalled',()=>{ $('#instBar').hidden=true; installEvt=null; toast('اتنزّل التطبيق، هتلاقيه على الشاشة الرئيسية'); });
+const icShare='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>';
+const icPlus='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/></svg>';
+const icDots='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+async function openInstall(){
+  if(standalone){ toast('انت فاتح التطبيق بالفعل'); return; }
+  if(installEvt){ try{ installEvt.prompt(); const r=await installEvt.userChoice; if(r?.outcome==='accepted'){ $('#instBar').hidden=true; } installEvt=null; return; }catch{} }
+  const link=S.code?linkFor(S.editCode||S.viewCode||S.code):location.origin;
+  let steps;
+  if(inApp) steps=`<li>البرنامج اللي انت فاتح منه (فيسبوك أو انستجرام) مش بيسمح بالتنزيل.</li><li>دوس ${icDots} فوق واختار <b>افتح في المتصفح</b>${isIOS?' (Safari)':' (Chrome)'}.</li><li>هناك هتلاقي زرار <b>نزّل التطبيق</b>.</li>`;
+  else if(isIOS) steps=isSafari?`<li>دوس زرار المشاركة ${icShare} اللي تحت في Safari.</li><li>انزل شوية واختار <b>Add to Home Screen</b> ${icPlus} (إضافة إلى الشاشة الرئيسية).</li><li>دوس <b>Add</b> فوق، وهتلاقي الأيقونة على الشاشة.</li>`
+    :`<li>دوس زرار المشاركة ${icShare} اللي جنب العنوان فوق.</li><li>اختار <b>Add to Home Screen</b> ${icPlus}.</li><li>لو مش لاقيها، افتح اللينك في <b>Safari</b> وكرر نفس الخطوات.</li>`;
+  else if(isAndroid) steps=`<li>دوس ${icDots} فوق في المتصفح.</li><li>اختار <b>تثبيت التطبيق</b> أو <b>Add to Home screen</b>.</li><li>وافق، وهتلاقي الأيقونة على الشاشة زي أي تطبيق.</li>`;
+  else steps=`<li>في Chrome أو Edge دوس على أيقونة التثبيت ${icPlus} في آخر شريط العنوان.</li><li>أو من القايمة ${icDots} اختار <b>تثبيت شجرة العيلة</b>.</li><li>على الموبايل افتح نفس اللينك ونزّله من هناك.</li>`;
+  openDlg(`<div class="dlg-h"><h3>نزّل التطبيق</h3>${xBtn}</div><div class="dlg-b">
+    <div class="inst-hero"><img src="/pwa-192.png" alt=""><p class="hint" style="margin:0">بيتفتح زي أي تطبيق من الشاشة الرئيسية، ومن غير نت بيعرض آخر نسخة من الشجرة.</p></div>
+    <ol class="inst-steps">${steps}</ol>
+    <div class="linkbox"><input id="instLink" value="${esc(link)}" readonly aria-label="لينك التطبيق"><button class="btn" id="instCopy">نسخ اللينك</button></div>
+  </div>`);
+  $('#instCopy').onclick=()=>{ $('#instLink').select(); copy($('#instLink').value); };
+}
