@@ -30,7 +30,7 @@ export const api = {
   createTree: (name) => rpc('create_tree', { p_name: name || '' }),
   openTree: (code) => rpc('open_tree', { p_code: code }),
   savePeople: (code, people) => rpc('save_people', { p_code: code, p_people: people }),
-  deletePerson: (code, id) => rpc('delete_person', { p_code: code, p_id: id }),
+  deletePerson: (code, id) => rpc('remove_person', { p_code: code, p_id: id }),
   renameTree: (code, name) => rpc('rename_tree', { p_code: code, p_name: name }),
   async uploadPhoto(treeId, personId, blob) {
     if (!sb) throw new Error('not configured');
