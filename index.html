@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>شجرة العيلة</title>
+<meta name="description" content="سجّل عيلتك كلها، الأجداد والأحفاد، والشجرة بتترتب لوحدها.">
+<meta name="theme-color" content="#1F3A31">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="شجرة العيلة">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:title" content="شجرة العيلة">
+<meta property="og:description" content="سجّل عيلتك كلها، الأجداد والأحفاد، والشجرة بتترتب لوحدها.">
+<meta property="og:image" content="/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Readex+Pro:wght@300;400;500;600;700&display=swap">
+</head>
+<body>
+<div id="landing" class="land" hidden></div>
+
+<div class="app" id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <button class="switch" id="switchTree" title="شجرة تانية">
+        <h1 id="famName">شجرة العيلة</h1>
+        <div class="stats" id="stats"></div>
+      </button>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="دوّر على اسم…" autocomplete="off" aria-label="بحث">
+      <div class="results" id="results" hidden></div>
+    </div>
+    <div class="tools">
+      <span class="offline" id="offChip" hidden>مفيش نت</span>
+      <span class="chip-ro" id="roChip" hidden>عرض فقط</span>
+      <button class="ibtn" id="bRel" title="صلة القرابة" aria-label="صلة القرابة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/><path d="m13 12 3 3-3 3"/></svg></button>
+      <button class="ibtn" id="bExport" title="تصدير صورة / PDF" aria-label="تصدير"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></button>
+      <button class="ibtn" id="bMenu" title="المشاركة والإعدادات" aria-label="المشاركة والإعدادات"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+    </div>
+  </header>
+
+  <main class="vp" id="vp">
+    <div class="stage" id="stage"><svg id="links"></svg><div id="cards"></div></div>
+    <div class="empty" id="empty" hidden></div>
+    <div class="banner" id="demoBar" hidden><span>ده مثال للتجربة، مش هيتحفظ</span><button id="exitDemo">اخرج من المثال</button></div>
+    <div class="branchbar" id="branchBar" hidden><span id="branchTxt"></span><button id="showAll">الشجرة كلها</button></div>
+    <div class="zoom">
+      <button class="ibtn" id="zIn" aria-label="تكبير"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="ibtn" id="zOut" aria-label="تصغير"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+      <button class="ibtn" id="zFit" aria-label="ملء الشاشة"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+    <button class="fab" id="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>إضافة فرد</span></button>
+  </main>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" aria-label="بيانات الشخص"><div class="grab"></div><div class="sheet-body" id="sheetBody"></div></aside>
+<dialog id="dlg"><div class="dlg" id="dlgIn"></div></dialog>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileImport" accept=".json,application/json" hidden>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
